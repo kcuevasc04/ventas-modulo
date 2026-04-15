@@ -56,9 +56,9 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { getProductos } from '../../services/ventasApi.js'
+import { getProductos, getClientes, getEmpleados } from '../../services/ventasApi.js'
 
-// 🔹 estados
+// estados
 const cliente = ref(null)
 const empleado = ref(null)
 
@@ -69,28 +69,24 @@ const empleados = ref([])
 const productoSeleccionado = ref(null)
 const cantidad = ref(1)
 
-// 🔥 traer productos reales desde backend
+// 🔥 cargar TODO desde BD
 onMounted(async () => {
   try {
-    const res = await getProductos()
-    productos.value = res.data
+    const resProd = await getProductos()
+    productos.value = resProd.data
+
+    const resClientes = await getClientes()
+    clientes.value = resClientes.data
+
+    const resEmpleados = await getEmpleados()
+    empleados.value = resEmpleados.data
+
   } catch (error) {
-    console.error('Error cargando productos:', error)
+    console.error('Error cargando datos:', error)
   }
-
-  // 👇 mientras conectas backend de clientes/empleados
-  clientes.value = [
-    { id: 1, nombre: 'Ana' },
-    { id: 2, nombre: 'Luis' }
-  ]
-
-  empleados.value = [
-    { id: 1, nombre: 'Carlos' },
-    { id: 2, nombre: 'María' }
-  ]
 })
 
-// 🔥 emitir al carrito
+// emitir al carrito
 const emit = defineEmits(['agregar'])
 
 const agregarProducto = () => {
@@ -101,7 +97,7 @@ const agregarProducto = () => {
   emit('agregar', {
     id: prod.id,
     nombre: prod.nombre,
-    precio: parseFloat(prod.precio), // 👈 importante (viene como string)
+    precio: parseFloat(prod.precio),
     cantidad: cantidad.value,
     subtotal: parseFloat(prod.precio) * cantidad.value
   })
