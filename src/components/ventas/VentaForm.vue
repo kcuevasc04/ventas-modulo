@@ -4,48 +4,106 @@
       Registrar Venta
     </v-card-title>
 
+    <v-alert
+      v-if="errorCarga"
+      type="error"
+      variant="tonal"
+      class="mb-4"
+      density="comfortable"
+    >
+      {{ errorCarga }}
+      <div class="mt-2">
+        <v-btn size="small" variant="outlined" @click="cargarCatalogos">
+          Reintentar
+        </v-btn>
+      </div>
+    </v-alert>
+
     <v-row>
-      <v-col cols="6">
-        <v-select
+      <v-col cols="12" md="4">
+        <v-autocomplete
           label="Cliente"
+          v-model="clienteId"
           :items="clientes"
-          item-title="nombre"
+          item-title="label"
           item-value="id"
-          v-model="cliente"
+          placeholder="Busca por nombre o apellido"
+          :loading="cargando"
+          :disabled="cargando || !!errorCarga"
+          no-data-text="No hay clientes disponibles"
+          clearable
         />
       </v-col>
 
-      <v-col cols="6">
-        <v-select
+      <v-col cols="12" md="4">
+        <v-autocomplete
           label="Empleado"
+          v-model="empleadoId"
           :items="empleados"
-          item-title="nombre"
+          item-title="label"
           item-value="id"
-          v-model="empleado"
+          placeholder="Busca por nombre o apellido"
+          :loading="cargando"
+          :disabled="cargando || !!errorCarga"
+          no-data-text="No hay empleados disponibles"
+          clearable
+        />
+      </v-col>
+
+      <v-col cols="12" md="4">
+        <v-select
+          label="Estado"
+          v-model="estado"
+          :items="estadosVenta"
+          item-title="label"
+          item-value="value"
         />
       </v-col>
     </v-row>
 
     <v-row>
-      <v-col cols="5">
-        <v-select
+      <v-col cols="12" md="4">
+        <v-autocomplete
           label="Producto"
+          v-model="productoId"
           :items="productos"
-          item-title="nombre"
+          item-title="label"
           item-value="id"
-          v-model="productoSeleccionado"
+          placeholder="Busca por nombre"
+          :loading="cargando"
+          :disabled="cargando || !!errorCarga"
+          no-data-text="No hay productos disponibles"
+          clearable
         />
       </v-col>
 
-      <v-col cols="3">
+      <v-col cols="12" md="2">
+        <v-text-field
+          label="Stock"
+          :model-value="productoSeleccionado ? productoSeleccionado.stock : '-'"
+          readonly
+        />
+      </v-col>
+
+      <v-col cols="12" md="2">
+        <v-text-field
+          label="Precio"
+          :model-value="productoSeleccionado ? Number(productoSeleccionado.precio).toFixed(2) : '-'"
+          readonly
+        />
+      </v-col>
+
+      <v-col cols="12" md="2">
         <v-text-field
           type="number"
           label="Cantidad"
+          min="1"
+          step="1"
           v-model="cantidad"
         />
       </v-col>
 
-      <v-col cols="2">
+      <v-col cols="12" md="2" class="d-flex align-center">
         <v-btn color="#7F1D25" @click="agregarProducto">
           Agregar
         </v-btn>
@@ -55,51 +113,120 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { getProductos, getClientes, getEmpleados } from '../../services/ventasApi.js'
+import { computed, onMounted, ref } from 'vue'
+import { getClientes, getEmpleados, getProductos } from '../../services/ventasApi.js'
 
-// estados
-const cliente = ref(null)
-const empleado = ref(null)
-
-const productos = ref([])
-const clientes = ref([])
-const empleados = ref([])
-
-const productoSeleccionado = ref(null)
+const clienteId = ref(null)
+const empleadoId = ref(null)
+const estado = ref('completada')
+const productoId = ref(null)
 const cantidad = ref(1)
 
-// 🔥 cargar TODO desde BD
-onMounted(async () => {
-  try {
-    const resProd = await getProductos()
-    productos.value = resProd.data
+const clientes = ref([])
+const empleados = ref([])
+const productos = ref([])
+const cargando = ref(false)
+const errorCarga = ref('')
 
-    const resClientes = await getClientes()
-    clientes.value = resClientes.data
+const estadosVenta = [
+  { label: 'Completada', value: 'completada' },
+  { label: 'Pendiente', value: 'pendiente' },
+  { label: 'Cancelada', value: 'cancelada' }
+]
 
-    const resEmpleados = await getEmpleados()
-    empleados.value = resEmpleados.data
-
-  } catch (error) {
-    console.error('Error cargando datos:', error)
-  }
+const productoSeleccionado = computed(() => {
+  return productos.value.find(item => Number(item.id) === Number(productoId.value)) || null
 })
 
-// emitir al carrito
+const cargarCatalogos = async () => {
+  cargando.value = true
+  errorCarga.value = ''
+
+  try {
+    const [resClientes, resEmpleados, resProductos] = await Promise.all([
+      getClientes(),
+      getEmpleados(),
+      getProductos()
+    ])
+
+    clientes.value = resClientes.data.map(item => ({
+      ...item,
+      label: `${item.nombre} ${item.apellido}`
+    }))
+
+    empleados.value = resEmpleados.data.map(item => ({
+      ...item,
+      label: `${item.nombre} ${item.apellido}`
+    }))
+
+    productos.value = resProductos.data.map(item => ({
+      ...item,
+      label: `${item.nombre} (Stock: ${item.stock})`
+    }))
+  } catch (error) {
+    console.error('No se pudieron cargar los datos del formulario:', error)
+    errorCarga.value = 'No se pudo conectar con la API de ventas. Verifica que el backend esté encendido en el puerto 3000.'
+  } finally {
+    cargando.value = false
+  }
+}
+
+onMounted(cargarCatalogos)
+
 const emit = defineEmits(['agregar'])
 
 const agregarProducto = () => {
-  const prod = productos.value.find(p => p.id === productoSeleccionado.value)
+  const clienteValue = Number(clienteId.value)
+  const empleadoValue = Number(empleadoId.value)
+  const productoValue = Number(productoId.value)
+  const cantidadIngresada = Number(cantidad.value)
 
-  if (!prod) return
+  if (!Number.isInteger(clienteValue) || clienteValue <= 0) {
+    return
+  }
+
+  if (!Number.isInteger(empleadoValue) || empleadoValue <= 0) {
+    return
+  }
+
+  if (!estado.value) {
+    return
+  }
+
+  if (!Number.isInteger(productoValue) || productoValue <= 0) {
+    return
+  }
+
+  if (!Number.isInteger(cantidadIngresada) || cantidadIngresada <= 0) {
+    return
+  }
+
+  const producto = productos.value.find(item => Number(item.id) === productoValue)
+
+  if (!producto) {
+    return
+  }
+
+  if (cantidadIngresada > Number(producto.stock)) {
+    return
+  }
+
+  const precioUnitario = Number(producto.precio)
 
   emit('agregar', {
-    id: prod.id,
-    nombre: prod.nombre,
-    precio: parseFloat(prod.precio),
-    cantidad: cantidad.value,
-    subtotal: parseFloat(prod.precio) * cantidad.value
+    clienteId: clienteValue,
+    empleadoId: empleadoValue,
+    estado: estado.value,
+    item: {
+      productoId: productoValue,
+      nombre: producto.nombre,
+      precioUnitario,
+      cantidad: cantidadIngresada,
+      subtotal: precioUnitario * cantidadIngresada
+    }
   })
+
+  productoId.value = null
+  cantidad.value = 1
 }
 </script>
