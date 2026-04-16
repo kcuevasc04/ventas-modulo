@@ -1,19 +1,22 @@
 import axios from 'axios'
 
-const API = 'http://localhost:3000'
+const API = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '')
+const apiClient = axios.create({
+  baseURL: API
+})
 
 export const getProductos = () => {
-  return axios.get(`${API}/productos`)
+  return apiClient.get('/productos')
 }
 
 export const getClientes = () => {
-  return axios.get(`${API}/clientes`)
+  return apiClient.get('/clientes')
 }
 
 export const getEmpleados = () => {
-  return axios.get(`${API}/empleados`)
+  return apiClient.get('/empleados')
 }
 
 export const guardarVenta = (data) => {
-  return axios.post(`${API}/ventas`, data)
+  return apiClient.post('/ventas', data)
 }

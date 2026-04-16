@@ -54,25 +54,25 @@ const rollbackTransaction = () => {
 }
 
 // rutas
-app.get('/productos', (req, res) => {
+const getProductos = (req, res) => {
   db.query('SELECT * FROM productos', (err, result) => {
     res.json(result)
   })
-})
+}
 
-app.get('/clientes', (req, res) => {
+const getClientes = (req, res) => {
   db.query('SELECT * FROM clientes', (err, result) => {
     res.json(result)
   })
-})
+}
 
-app.get('/empleados', (req, res) => {
+const getEmpleados = (req, res) => {
   db.query('SELECT * FROM empleados', (err, result) => {
     res.json(result)
   })
-})
+}
 
-app.post('/ventas', async (req, res) => {
+const crearVenta = async (req, res) => {
   const clienteId = Number(req.body.clienteId ?? req.body.cliente_id)
   const empleadoId = Number(req.body.empleadoId ?? req.body.empleado_id)
   const estado = String(req.body.estado || 'completada')
@@ -175,9 +175,22 @@ app.post('/ventas', async (req, res) => {
     console.error('Error guardando venta:', error)
     res.status(500).json({ message: 'Error guardando la venta en la base de datos' })
   }
-})
+}
 
-// iniciar servidor
-app.listen(3000, () => {
-  console.log('Servidor en http://localhost:3000 🔥')
-})
+app.get('/productos', getProductos)
+app.get('/clientes', getClientes)
+app.get('/empleados', getEmpleados)
+app.post('/ventas', crearVenta)
+
+app.get('/api/productos', getProductos)
+app.get('/api/clientes', getClientes)
+app.get('/api/empleados', getEmpleados)
+app.post('/api/ventas', crearVenta)
+
+if (!process.env.VERCEL) {
+  app.listen(3000, () => {
+    console.log('Servidor en http://localhost:3000 🔥')
+  })
+}
+
+module.exports = app
