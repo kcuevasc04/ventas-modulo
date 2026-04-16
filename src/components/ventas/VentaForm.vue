@@ -165,7 +165,9 @@ const cargarCatalogos = async () => {
     }))
   } catch (error) {
     console.error('No se pudieron cargar los datos del formulario:', error)
-    errorCarga.value = 'No se pudo conectar con la API de ventas. Verifica que el backend esté encendido en el puerto 3000.'
+    const status = error?.response?.status
+    const detail = error?.response?.data?.detail || error?.response?.data?.message || error?.message
+    errorCarga.value = `No se pudo cargar la API de ventas${status ? ` (HTTP ${status})` : ''}. ${detail || 'Verifica backend y variables de entorno de la BD.'}`
   } finally {
     cargando.value = false
   }

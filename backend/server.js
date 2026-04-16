@@ -56,18 +56,30 @@ const rollbackTransaction = () => {
 // rutas
 const getProductos = (req, res) => {
   db.query('SELECT * FROM productos', (err, result) => {
+    if (err) {
+      return res.status(500).json({ message: 'Error consultando productos', detail: err.message })
+    }
+
     res.json(result)
   })
 }
 
 const getClientes = (req, res) => {
   db.query('SELECT * FROM clientes', (err, result) => {
+    if (err) {
+      return res.status(500).json({ message: 'Error consultando clientes', detail: err.message })
+    }
+
     res.json(result)
   })
 }
 
 const getEmpleados = (req, res) => {
   db.query('SELECT * FROM empleados', (err, result) => {
+    if (err) {
+      return res.status(500).json({ message: 'Error consultando empleados', detail: err.message })
+    }
+
     res.json(result)
   })
 }
