@@ -8,80 +8,37 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
-const query = (sql, params = []) => {
-  return new Promise((resolve, reject) => {
-    db.query(sql, params, (err, result) => {
-      if (err) {
-        reject(err)
-        return
-      }
-
-      resolve(result)
-    })
-  })
-}
-
-const beginTransaction = () => {
-  return new Promise((resolve, reject) => {
-    db.beginTransaction(err => {
-      if (err) {
-        reject(err)
-        return
-      }
-
-      resolve()
-    })
-  })
-}
-
-const commitTransaction = () => {
-  return new Promise((resolve, reject) => {
-    db.commit(err => {
-      if (err) {
-        reject(err)
-        return
-      }
-
-      resolve()
-    })
-  })
-}
-
-const rollbackTransaction = () => {
-  return new Promise(resolve => {
-    db.rollback(() => resolve())
-  })
+const query = async (sql, params = []) => {
+  const [rows] = await db.query(sql, params)
+  return rows
 }
 
 // rutas
-const getProductos = (req, res) => {
-  db.query('SELECT * FROM productos', (err, result) => {
-    if (err) {
-      return res.status(500).json({ message: 'Error consultando productos', detail: err.message })
-    }
-
+const getProductos = async (req, res) => {
+  try {
+    const result = await query('SELECT * FROM productos')
     res.json(result)
-  })
+  } catch (err) {
+    return res.status(500).json({ message: 'Error consultando productos', detail: err.message })
+  }
 }
 
-const getClientes = (req, res) => {
-  db.query('SELECT * FROM clientes', (err, result) => {
-    if (err) {
-      return res.status(500).json({ message: 'Error consultando clientes', detail: err.message })
-    }
-
+const getClientes = async (req, res) => {
+  try {
+    const result = await query('SELECT * FROM clientes')
     res.json(result)
-  })
+  } catch (err) {
+    return res.status(500).json({ message: 'Error consultando clientes', detail: err.message })
+  }
 }
 
-const getEmpleados = (req, res) => {
-  db.query('SELECT * FROM empleados', (err, result) => {
-    if (err) {
-      return res.status(500).json({ message: 'Error consultando empleados', detail: err.message })
-    }
-
+const getEmpleados = async (req, res) => {
+  try {
+    const result = await query('SELECT * FROM empleados')
     res.json(result)
-  })
+  } catch (err) {
+    return res.status(500).json({ message: 'Error consultando empleados', detail: err.message })
+  }
 }
 
 const crearVenta = async (req, res) => {
@@ -112,7 +69,7 @@ const crearVenta = async (req, res) => {
     return res.status(400).json({ message: 'Los productos de la venta son inválidos' })
   }
 
-  let enTransaccion = false
+  let connection
 
   try {
     const clienteExiste = await query('SELECT id FROM clientes WHERE id = ?', [clienteId])
@@ -152,27 +109,27 @@ const crearVenta = async (req, res) => {
 
     const total = detalleConPrecios.reduce((sum, item) => sum + item.subtotal, 0)
 
-    await beginTransaction()
-    enTransaccion = true
+    connection = await db.getConnection()
+    await connection.beginTransaction()
 
-    const ventaResult = await query(
+    const [ventaResult] = await connection.query(
       'INSERT INTO ventas (cliente_id, empleado_id, total, estado) VALUES (?, ?, ?, ?)',
       [clienteId, empleadoId, total, estado]
     )
 
     for (const item of detalleConPrecios) {
-      await query(
+      await connection.query(
         'INSERT INTO detalle_ventas (venta_id, producto_id, cantidad, precio_unitario, subtotal) VALUES (?, ?, ?, ?, ?)',
         [ventaResult.insertId, item.productoId, item.cantidad, item.precioUnitario, item.subtotal]
       )
 
-      await query(
+      await connection.query(
         'UPDATE productos SET stock = stock - ? WHERE id = ?',
         [item.cantidad, item.productoId]
       )
     }
 
-    await commitTransaction()
+    await connection.commit()
 
     res.status(201).json({
       message: 'Venta registrada correctamente',
@@ -180,12 +137,16 @@ const crearVenta = async (req, res) => {
       total
     })
   } catch (error) {
-    if (enTransaccion) {
-      await rollbackTransaction()
+    if (connection) {
+      await connection.rollback()
     }
 
     console.error('Error guardando venta:', error)
     res.status(500).json({ message: 'Error guardando la venta en la base de datos' })
+  } finally {
+    if (connection) {
+      connection.release()
+    }
   }
 }
 
